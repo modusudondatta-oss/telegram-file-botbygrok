@@ -252,7 +252,10 @@ def main():
         entry_points=[CommandHandler('newbatch', newbatch)],
         states={
             UPLOAD_FILES: [
-                MessageHandler(filters.PHOTO | filters.VIDEO | filters.AUDIO | filters.DOCUMENT, upload_file),
+                MessageHandler(
+                    filters.PHOTO | filters.VIDEO | filters.AUDIO | filters.Document.ALL,
+                    upload_file
+                ),
                 CallbackQueryHandler(handle_done_upload, pattern='^done_upload$')
             ],
             ADD_CAPTION: [
