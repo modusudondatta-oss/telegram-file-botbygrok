@@ -1,7 +1,6 @@
 import os
 import uuid
 import asyncio
-import aiosqlite
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
@@ -14,6 +13,7 @@ from telegram.ext import (
 )
 from telegram.request import HTTPXRequest
 from telegram.error import TelegramError
+import aiosqlite
 
 # ────────────────────────────────────────────────
 # CONFIG
@@ -291,7 +291,7 @@ async def check_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
-    _, batch_id = query.data.split("_", 2)[1:]
+    batch_id = query.data.split("_", 1)[1]
 
     if await check_membership(context, query.from_user.id):
         await query.message.edit_text("Access granted. Sending files...")
@@ -339,7 +339,6 @@ def main():
             ],
         },
         fallbacks=[],
-        # Recommended setting for CallbackQueryHandler inside ConversationHandler
         per_message=False,
     )
 
@@ -356,8 +355,8 @@ def main():
         poll_interval=0.5,
     )
 
-
 if __name__ == "__main__":
-    # Run init_db synchronously once at startup
-    asyncio.run(init_db())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(init_db())
     main()
