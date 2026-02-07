@@ -1,6 +1,7 @@
 import os
 import uuid
 import asyncio
+import aiosqlite
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
@@ -13,26 +14,18 @@ from telegram.ext import (
 )
 from telegram.request import HTTPXRequest
 from telegram.error import TelegramError
-import aiosqlite
 
-# ────────────────────────────────────────────────
-# CONFIG
-# ────────────────────────────────────────────────
-
-BOT_USERNAME          = "OnlyHubServerBot"
-ALLOWED_UPLOADERS     = [8295342154, 7025490921]
+# Constants
+BOT_USERNAME = "OnlyHubServerBot"
+ALLOWED_UPLOADERS = [8295342154, 7025490921]
 FORCE_CHANNEL_USERNAME = "only_hub69"
-FORCE_CHANNEL_URL     = "https://t.me/only_hub69"
-STORAGE_CHANNEL_ID    = -1003893001355
-AUTO_DELETE_SECONDS   = 600
-DB_FILE               = "files.db"
+FORCE_CHANNEL_URL = "https://t.me/only_hub69"
+STORAGE_CHANNEL_ID = -1003893001355
+AUTO_DELETE_SECONDS = 600
+DB_FILE = "files.db"
 
 # Conversation states
 UPLOAD_FILES, ADD_CAPTION = range(2)
-
-# ────────────────────────────────────────────────
-# DATABASE
-# ────────────────────────────────────────────────
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -57,10 +50,6 @@ async def init_db():
             )
         ''')
         await db.commit()
-
-# ────────────────────────────────────────────────
-# HANDLERS
-# ────────────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
@@ -88,14 +77,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await send_files(update, context, batch_id)
 
-
 async def check_membership(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     try:
         member = await context.bot.get_chat_member(chat_id=f"@{FORCE_CHANNEL_USERNAME}", user_id=user_id)
         return member.status in ("member", "administrator", "creator")
     except:
         return False
-
 
 async def send_files(update: Update, context: ContextTypes.DEFAULT_TYPE, batch_id: str):
     chat_id = update.effective_chat.id
@@ -131,7 +118,6 @@ async def send_files(update: Update, context: ContextTypes.DEFAULT_TYPE, batch_i
         name=f"autodel_{chat_id}_{uuid.uuid4().hex[:8]}"
     )
 
-
 async def delete_messages(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     chat_id = job.data["chat_id"]
@@ -143,12 +129,10 @@ async def delete_messages(context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-
 async def check_batch_exists(batch_id: str) -> bool:
     async with aiosqlite.connect(DB_FILE) as db:
         cur = await db.execute("SELECT 1 FROM batches WHERE batch_id = ?", (batch_id,))
         return bool(await cur.fetchone())
-
 
 async def get_batch_data(batch_id: str):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -162,7 +146,6 @@ async def get_batch_data(batch_id: str):
 
         return caption, msg_ids
 
-
 async def increment_downloads(batch_id: str):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
@@ -174,7 +157,6 @@ async def increment_downloads(batch_id: str):
             (batch_id,)
         )
         await db.commit()
-
 
 async def newbatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ALLOWED_UPLOADERS:
@@ -189,7 +171,6 @@ async def newbatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return UPLOAD_FILES
 
-
 async def upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ALLOWED_UPLOADERS:
         return
@@ -203,7 +184,6 @@ async def upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text("File added to batch.")
 
-
 async def handle_done_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -216,18 +196,15 @@ async def handle_done_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.message.edit_text("Send caption for this batch (or /skip):")
     return ADD_CAPTION
 
-
 async def set_caption(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["batch_caption"] = update.message.text
     await finalize_batch(update, context)
     return ConversationHandler.END
 
-
 async def skip_caption(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["batch_caption"] = None
     await finalize_batch(update, context)
     return ConversationHandler.END
-
 
 async def finalize_batch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     batch_id = uuid.uuid4().hex[:12]
@@ -247,7 +224,6 @@ async def finalize_batch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Cleanup
     for k in ["batch_files", "batch_caption"]:
         context.user_data.pop(k, None)
-
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ALLOWED_UPLOADERS:
@@ -286,12 +262,11 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(text)
 
-
 async def check_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    batch_id = query.data.split("_", 1)[1]
+    batch_id = query.data.replace("check_join_", "")
 
     if await check_membership(context, query.from_user.id):
         await query.message.edit_text("Access granted. Sending files...")
@@ -299,27 +274,20 @@ async def check_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await query.answer("You still haven't joined the channel.", show_alert=True)
 
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     print(f"Exception: {context.error}")
-
-
-# ────────────────────────────────────────────────
-# MAIN
-# ────────────────────────────────────────────────
 
 def main():
     token = os.getenv("BOT_TOKEN")
     if not token:
         raise RuntimeError("BOT_TOKEN environment variable is not set")
 
-    request = HTTPXRequest(connect_timeout=15, read_timeout=30)
+    request = HTTPXRequest(connect_timeout=15.0, read_timeout=30.0)
 
     application = (
         Application.builder()
         .token(token)
         .request(request)
-        .get_updates_read_timeout(30)
         .build()
     )
 
@@ -356,7 +324,5 @@ def main():
     )
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(init_db())
+    asyncio.run(init_db())
     main()
